@@ -13,6 +13,18 @@ A fully offline, Docker-powered Postgres database built from your personal Fitbi
 
 ---
 
+## 💻 Compatibility
+
+| Platform | Supported |
+|----------|-----------|
+| macOS (Intel + Apple Silicon) | ✅ |
+| Linux (Ubuntu / Debian) | ✅ |
+| Windows (WSL2) | ⚠️ Mostly works — run `bash setup.sh` inside WSL2 |
+
+> The `setup.sh` script auto-detects your OS. On **macOS** it uses Homebrew to install dependencies. On **Linux** it uses apt/get.docker.com.
+
+---
+
 ## 🚀 Quick Start
 
 ### Step 1 — Get Your Fitbit Data
@@ -52,12 +64,18 @@ dl-fitbit-data/
 bash setup.sh
 ```
 
-This script will automatically:
-- ✅ Install **Docker** if not found (Linux only, requires sudo)
+This script automatically detects **macOS or Linux** and will:
+- ✅ Install **Docker** if not found
+  - *macOS*: via Homebrew (`brew install --cask docker`) or prompts you to install Docker Desktop
+  - *Linux*: via `get.docker.com` (requires sudo)
 - ✅ Install **Node.js** if not found
+  - *macOS*: via Homebrew (`brew install node`)
+  - *Linux*: via NodeSource apt repository
 - ✅ Copy `.env.example` → `.env` with local database credentials
 - ✅ Pull and start the **Postgres 15** Docker container
 - ✅ Install Node package dependencies
+
+> **macOS users**: If you don't have Homebrew, install it first from [brew.sh](https://brew.sh), or manually install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and [Node.js](https://nodejs.org/en/download) before running `setup.sh`.
 
 ---
 

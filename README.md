@@ -138,50 +138,109 @@ Use these connection details:
 
 ---
 
-## 📊 Example SQL Queries
+## 📊 Running Queries
 
-### Average resting heart rate per month
-```sql
-SELECT
-  DATE_TRUNC('month', datetime) AS month,
-  ROUND(AVG(bpm)::numeric, 1) AS avg_bpm
-FROM heart_rate
-GROUP BY 1
-ORDER BY 1;
+You can run any SQL query as a one-liner directly from your terminal — no need to enter the interactive shell. Just replace the SQL inside the `-c "..."` flag.
+
+### 📋 Explore your data
+
+**List all tables with row counts:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT relname AS table_name, n_live_tup AS row_count FROM pg_stat_user_tables ORDER BY n_live_tup DESC;"
 ```
 
-### Daily step count over the last 90 days
-```sql
-SELECT
-  DATE(datetime) AS day,
-  SUM(steps) AS total_steps
-FROM steps
-WHERE datetime >= NOW() - INTERVAL '90 days'
-GROUP BY 1
-ORDER BY 1;
+**See the columns of a specific table:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "\d heart_rate"
 ```
 
-### Sleep duration trend by month
-```sql
-SELECT
-  creation_date,
-  sleep_type,
-  ROUND(sleep_duration::numeric, 2) AS hours,
-  ROUND(deep_sleep::numeric, 1) AS deep_pct,
-  ROUND(rem_sleep::numeric, 1) AS rem_pct
-FROM sleep_profiles
-ORDER BY creation_date DESC;
+**Preview the first 5 rows of any table:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT * FROM steps LIMIT 5;"
 ```
 
-### Heart rate variability trend
-```sql
-SELECT
-  DATE_TRUNC('month', timestamp) AS month,
-  ROUND(AVG(rmssd)::numeric, 1) AS avg_rmssd
-FROM heart_rate_variability
-GROUP BY 1
-ORDER BY 1;
+---
+
+### ❤️ Heart Rate
+
+**Average resting heart rate per month:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT DATE_TRUNC('month', datetime) AS month, ROUND(AVG(bpm)::numeric, 1) AS avg_bpm FROM heart_rate GROUP BY 1 ORDER BY 1;"
 ```
+
+**Highest ever recorded heart rate:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT datetime, bpm FROM heart_rate ORDER BY bpm DESC LIMIT 10;"
+```
+
+---
+
+### 🚶 Steps
+
+**Daily step count over the last 90 days:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT DATE(datetime) AS day, SUM(steps) AS total_steps FROM steps WHERE datetime >= NOW() - INTERVAL '90 days' GROUP BY 1 ORDER BY 1;"
+```
+
+**Best step days ever:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT DATE(datetime) AS day, SUM(steps) AS total_steps FROM steps GROUP BY 1 ORDER BY 2 DESC LIMIT 10;"
+```
+
+---
+
+### 😴 Sleep
+
+**Monthly sleep profile summary:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT creation_date, sleep_type, ROUND(sleep_duration::numeric, 2) AS hours, ROUND(deep_sleep::numeric, 1) AS deep_pct, ROUND(rem_sleep::numeric, 1) AS rem_pct FROM sleep_profiles ORDER BY creation_date DESC LIMIT 12;"
+```
+
+---
+
+### 💓 Heart Rate Variability (HRV)
+
+**Monthly average HRV (RMSSD):**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT DATE_TRUNC('month', timestamp) AS month, ROUND(AVG(rmssd)::numeric, 1) AS avg_rmssd FROM heart_rate_variability GROUP BY 1 ORDER BY 1;"
+```
+
+---
+
+### 🌡️ Temperature
+
+**Average wrist temperature by month:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT DATE_TRUNC('month', datetime) AS month, ROUND(AVG(temperature_celsius)::numeric, 2) AS avg_temp_c FROM device_temperature GROUP BY 1 ORDER BY 1;"
+```
+
+---
+
+### 🔥 Calories
+
+**Total calories burned per week:**
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT DATE_TRUNC('week', datetime) AS week, ROUND(SUM(calorie)::numeric, 0) AS total_calories FROM calories GROUP BY 1 ORDER BY 1 DESC LIMIT 20;"
+```
+
+---
+
+> **Tip:** You can also enter the interactive shell for longer queries:
+> ```bash
+> docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db
+> ```
+> Then type your SQL freely and exit with `\q`.
 
 ---
 

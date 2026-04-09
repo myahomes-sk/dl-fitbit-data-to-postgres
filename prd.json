@@ -1,0 +1,73 @@
+{
+  "project": "Fitbit Supabase Migration",
+  "branchName": "ralph/fitbit-migration",
+  "description": "Migrate local Fitbit exported CSV data into a connected Supabase instance.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Set up Supabase script environment",
+      "description": "As a developer, I need to initialize a project to run migration scripts against Supabase.",
+      "acceptanceCriteria": [
+        "Initialize script project to parse CSVs and read DB connection string from .env",
+        "Install Supabase client or database drivers",
+        "Write base connection script and verify connection",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create Heart Rate Alerts schema",
+      "description": "As a data engineer, I want to create a database table matching the Heart Rate Alerts CSV.",
+      "acceptanceCriteria": [
+        "Create 'heart_rate_alerts' table with columns: id, start_timestamp, end_timestamp, type, threshold, value",
+        "Generate and run migration successfully against the connected DB",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Ingest Heart Rate Alerts data",
+      "description": "As a developer, I want to script the file read and database insert for Heart Rate Alerts.",
+      "acceptanceCriteria": [
+        "Script parses 'Heart Rate/Heart Rate Notifications Alerts.csv'",
+        "Rows are structured and inserted correctly ignoring duplicate primary keys",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create Sleep Profiles schema",
+      "description": "As a data engineer, I want a table representing the Sleep Profile export.",
+      "acceptanceCriteria": [
+        "Create 'sleep_profiles' table with required dates, floats, and text columns as seen in the CSV",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Ingest Sleep Profile data",
+      "description": "As a developer, I want to script the parse and load stage for Sleep Profiles.",
+      "acceptanceCriteria": [
+        "Script parses 'Sleep/Sleep Profile.csv'",
+        "Numerical floats and strings are correctly mapped to DB columns and inserted",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+# Environment variables (contains secrets - never commit!)
+.env
+
+# Local Postgres data volume (too large for git, ~5-6 GB)
+.db_data/
+
+# Node dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# -----------------------------------------------
+# Fitbit Data Folders (download from Google Takeout)
+# See README.md for instructions on how to get this data
+# -----------------------------------------------
+Account Changes/
+Active Zone Minutes (AZM)/
+Activity Goals/
+Atrial Fibrillation PPG/
+Biometrics/
+Commerce_GoogleData/
+Daily Readiness/
+Device Events_GoogleData/
+Discover/
+Email Notifications Settings_GoogleData/
+Fitbit Friends/
+Fitbit Premium/
+Global Export Data/
+Guided Programs/
+Health Fitness Data_GoogleData/
+Heart Rate/
+Heart Rate Variability/
+Menstrual Health/
+Messages/
+Mindfulness/
+Oxygen Saturation (SpO2)/
+Paired Devices/
+Physical Activity_GoogleData/
+Sleep/
+Sleep Score/
+Snore and Noise Detect/
+Social/
+Stress Journal/
+Stress Score/
+Temperature/
+User Security Data/
+Your Profile/

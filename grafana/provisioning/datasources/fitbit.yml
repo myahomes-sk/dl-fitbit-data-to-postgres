@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: FitbitDB
+    type: postgres
+    url: db:5432
+    database: fitbit_db
+    user: fitbit_user
+    secureJsonData:
+      password: fitbit_pass
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true

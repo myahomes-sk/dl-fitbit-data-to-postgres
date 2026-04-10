@@ -1,0 +1,343 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_FITBITDB",
+      "label": "FitbitDB",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "postgres",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
+    { "type": "panel", "id": "barchart", "name": "Bar chart", "version": "" }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100, "title": "📊 Today's Summary", "type": "row" },
+
+    {
+      "id": 1, "title": "Steps Today", "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 5000 },
+            { "color": "green", "value": 8000 }
+          ]},
+          "unit": "short", "mappings": []
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT COALESCE(SUM(total_steps), 0) AS \"Steps Today\" FROM steps_daily WHERE day = CURRENT_DATE",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    {
+      "id": 2, "title": "Avg Heart Rate (7d)", "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 90 },
+            { "color": "red", "value": 100 }
+          ]},
+          "unit": "short", "decimals": 1, "mappings": []
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT ROUND(AVG(avg_bpm)::numeric, 1) AS \"Avg BPM\" FROM heart_rate_daily WHERE day >= CURRENT_DATE - 7",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    {
+      "id": 3, "title": "Last Night's Sleep", "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 6 },
+            { "color": "green", "value": 7 }
+          ]},
+          "unit": "h", "decimals": 1, "mappings": []
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT total_hours AS \"Hours\" FROM sleep_nightly ORDER BY night DESC LIMIT 1",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    {
+      "id": 4, "title": "Latest HRV (RMSSD)", "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "yellow", "value": 20 },
+            { "color": "green", "value": 30 }
+          ]},
+          "unit": "ms", "decimals": 1, "mappings": []
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT ROUND(AVG(root_mean_square_of_successive_differences_milliseconds)::numeric, 1) AS \"RMSSD\" FROM heart_rate_variability WHERE timestamp >= NOW() - INTERVAL '3 days'",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101, "title": "❤️ Heart Rate", "type": "row" },
+
+    {
+      "id": 5, "title": "Daily Heart Rate", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity", "spanNulls": true },
+          "unit": "short", "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Min BPM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Avg BPM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Max BPM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT day::timestamptz AS \"time\", min_bpm AS \"Min BPM\", avg_bpm AS \"Avg BPM\", max_bpm AS \"Max BPM\" FROM heart_rate_daily WHERE day BETWEEN $__timeFrom()::date AND $__timeTo()::date ORDER BY day",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 102, "title": "🚶 Activity", "type": "row" },
+
+    {
+      "id": 6, "title": "Daily Steps", "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "orientation": "auto", "xTickLabelRotation": 0, "xTickLabelSpacing": 100,
+        "barRadius": 0.05, "groupWidth": 0.7, "fillOpacity": 80, "gradientMode": "none",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 1, "fillOpacity": 80 },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null },
+            { "color": "green", "value": 8000 }
+          ]},
+          "color": { "mode": "thresholds" }, "unit": "short"
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT day::timestamptz AS \"time\", total_steps AS \"Steps\" FROM steps_daily WHERE day BETWEEN $__timeFrom()::date AND $__timeTo()::date ORDER BY day",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    {
+      "id": 7, "title": "Daily Calories Burned", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "gradientMode": "opacity", "spanNulls": true },
+          "color": { "fixedColor": "#FF9830", "mode": "fixed" }, "unit": "kcal"
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT DATE(timestamp AT TIME ZONE 'UTC')::timestamptz AS \"time\", ROUND(SUM(calories::numeric), 0) AS \"Calories\" FROM calories WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "id": 103, "title": "😴 Sleep", "type": "row" },
+
+    {
+      "id": 8, "title": "Nightly Sleep Duration", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 20, "gradientMode": "opacity", "spanNulls": false, "drawStyle": "bars", "barAlignment": 0 },
+          "color": { "fixedColor": "#5794F2", "mode": "fixed" }, "unit": "h", "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null }, { "color": "yellow", "value": 6 }, { "color": "green", "value": 7 }
+          ]}
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Deep (h)" }, "properties": [{ "id": "color", "value": { "fixedColor": "#1F60C4", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "REM (h)" }, "properties": [{ "id": "color", "value": { "fixedColor": "#8AB8FF", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT night::timestamptz AS \"time\", total_hours AS \"Total (h)\", ROUND((deep_min / 60.0)::numeric, 2) AS \"Deep (h)\", ROUND((rem_min / 60.0)::numeric, 2) AS \"REM (h)\" FROM sleep_nightly WHERE night BETWEEN $__timeFrom()::date AND $__timeTo()::date ORDER BY night",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    {
+      "id": 9, "title": "Sleep Stage Breakdown (last 14 nights)", "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "orientation": "auto", "xTickLabelRotation": -45, "groupWidth": 0.7, "fillOpacity": 80,
+        "stacking": "normal", "gradientMode": "none",
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "m", "custom": { "fillOpacity": 80 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Deep" }, "properties": [{ "id": "color", "value": { "fixedColor": "#1F60C4", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "REM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#8AB8FF", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Light" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Awake" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT night::timestamptz AS \"time\", deep_min AS \"Deep\", rem_min AS \"REM\", light_min AS \"Light\", awake_min AS \"Awake\" FROM sleep_nightly ORDER BY night DESC LIMIT 14",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 104, "title": "💓 HRV & Temperature", "type": "row" },
+
+    {
+      "id": 10, "title": "Heart Rate Variability (RMSSD)", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean", "last"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity", "spanNulls": true },
+          "color": { "fixedColor": "#B877D9", "mode": "fixed" }, "unit": "ms", "decimals": 1
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT DATE_TRUNC('day', timestamp)::timestamptz AS \"time\", ROUND(AVG(root_mean_square_of_successive_differences_milliseconds)::numeric, 1) AS \"RMSSD (ms)\" FROM heart_rate_variability WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    {
+      "id": 11, "title": "Skin Temperature (Nightly Relative)", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean", "last"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "gradientMode": "opacity", "spanNulls": true },
+          "color": { "fixedColor": "#FF9830", "mode": "fixed" }, "unit": "celsius", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null }, { "color": "green", "value": -0.5 }, { "color": "red", "value": 0.5 }
+          ]}
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT DATE_TRUNC('day', recorded_time)::timestamptz AS \"time\", ROUND(AVG(temperature)::numeric, 3) AS \"Temp ΔC\" FROM device_temperature WHERE $__timeFilter(recorded_time) GROUP BY 1 ORDER BY 1",
+        "format": "table", "refId": "A"
+      }]
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "id": 105, "title": "📅 Weekly Summary", "type": "row" },
+
+    {
+      "id": 12, "title": "Weekly Averages", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 42 },
+      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 5, "gradientMode": "none", "spanNulls": true },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Avg Steps/day" }, "properties": [{ "id": "unit", "value": "short" }, { "id": "custom.axisPlacement", "value": "right" }] },
+          { "matcher": { "id": "byName", "options": "Avg BPM" }, "properties": [{ "id": "unit", "value": "short" }] },
+          { "matcher": { "id": "byName", "options": "Avg Sleep (h)" }, "properties": [{ "id": "unit", "value": "h" }] }
+        ]
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "rawSql": "SELECT week::timestamptz AS \"time\", avg_daily_steps AS \"Avg Steps/day\", avg_resting_bpm AS \"Avg BPM\" FROM weekly_summary WHERE week BETWEEN $__timeFrom()::timestamptz AND $__timeTo()::timestamptz ORDER BY week",
+        "format": "table", "refId": "A"
+      }]
+    }
+
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["fitbit", "health"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "🏃 Fitbit Health Dashboard",
+  "uid": "fitbit-health-v1",
+  "version": 1
+}

@@ -155,13 +155,38 @@ Using Fitbit wearer timezone: Asia/Kolkata
 
 #### 5d. Schedule daily auto-sync (optional)
 
-```bash
-# Edit your crontab
-crontab -e
+Run the installer script — it adds the cron job automatically and won't add duplicates if you run it again:
 
-# Add this line — runs every morning at 7am
-0 7 * * * cd /path/to/dl-fitbit-data && node sync.js >> logs/sync.log 2>&1
+```bash
+bash scripts/install_cron.sh
 ```
+
+Output:
+```
+✅ Cron job installed successfully!
+
+   Schedule: Every day at 7:00 AM
+   Script:   /path/to/dl-fitbit-data/scripts/daily_sync.sh
+   Logs:     /path/to/dl-fitbit-data/logs/sync.log
+```
+
+**Verify it was installed:**
+```bash
+crontab -l
+# 0 7 * * * /path/to/dl-fitbit-data/scripts/daily_sync.sh
+```
+
+**Watch the log live:**
+```bash
+tail -f logs/sync.log
+```
+
+**Remove the cron job:**
+```bash
+crontab -l | grep -v 'daily_sync.sh' | crontab -
+```
+
+> **Note:** If `docker compose` is not running at 7am, the sync skips silently — it does NOT try to start Docker automatically. Run `docker compose up -d` to bring everything back up, and the next morning's cron will work normally.
 
 ---
 

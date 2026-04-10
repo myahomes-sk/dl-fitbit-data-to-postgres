@@ -325,8 +325,13 @@ docker compose up -d
 # Stop everything
 docker compose down
 
-# View logs
+# Restart everything after reboot
+docker compose up -d
+
+# View Grafana logs
 docker logs fitbit-grafana
+
+# View Postgres logs
 docker logs fitbit-postgres
 
 # Re-run migration (safe — rebuilds tables from CSV)
@@ -334,6 +339,15 @@ node auto_migrate.js
 
 # Sync latest data from Fitbit API
 node sync.js
+
+# Check the daily sync log (live tail)
+tail -f logs/sync.log
+
+# View installed cron job
+crontab -l
+
+# Remove the cron job
+crontab -l | grep -v 'daily_sync.sh' | crontab -
 ```
 
 ---

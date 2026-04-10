@@ -282,7 +282,7 @@ async function syncCalories() {
     console.log(`   ✅ Inserted ${totalRows} new calorie records`);
 }
 
-// ── Sync: Sleep stages ────────────────────────────────────────────────────────
+// ── Sync: Sleep stages (with dedup fix) ────────────────────────────────
 async function syncSleep() {
     const startDate = await getLastSyncDate('usersleepstages', 'sleep_stage_start');
     const today = new Date();
@@ -300,17 +300,26 @@ async function syncSleep() {
     }
 
     const sessions = body?.sleep || [];
-    let totalRows = 0;
+    if (sessions.length === 0) {
+        console.log('   ✅ No new sleep sessions to sync');
+        return;
+    }
 
+    // DEDUP FIX: delete any existing 'Fitbit API' records for these sleep_ids
+    // before re-inserting, so we never accumulate duplicate API sessions
+    const logIds = sessions.map(s => String(s.logId));
+    await sql`DELETE FROM usersleepstages WHERE sleep_id = ANY(${logIds}) AND data_source = 'Fitbit API'`;
+
+    let totalRows = 0;
     for (const session of sessions) {
         const stages = session.levels?.data || [];
         const rows = stages.map(s => ({
             sleep_id: String(session.logId),
-            sleep_stage_id: String(s.dateTime).replace(/\D/g, ''),
+            sleep_stage_id: String(s.dateTime).replace(/\D/g, '') + String(session.logId).slice(-4),
             sleep_stage_type: s.level.toUpperCase(),
-            start_utc_offset: session.startTime.slice(-6),
+            start_utc_offset: (session.startTime || '').slice(-6) || '+00:00',
             sleep_stage_start: new Date(s.dateTime).toISOString(),
-            end_utc_offset: session.endTime.slice(-6),
+            end_utc_offset: (session.endTime || '').slice(-6) || '+00:00',
             sleep_stage_end: new Date(new Date(s.dateTime).getTime() + s.seconds * 1000).toISOString(),
             data_source: 'Fitbit API',
             algorithm_version: 'none',
@@ -398,6 +407,107 @@ async function syncSpO2() {
     console.log(`   ✅ Inserted ${totalRows} new SpO2 records`);
 }
 
+// ── Sync: Heart Rate Variability ──────────────────────────────────────────────
+async function syncHRV() {
+    const startDate = await getLastSyncDate('heart_rate_variability', 'timestamp');
+    const today = new Date();
+    const rangeEnd = new Date(Math.min(addDays(startDate, 29).getTime(), today.getTime()));
+    console.log(`\n💓 HRV: syncing from ${formatDate(startDate)} to ${formatDate(rangeEnd)}`);
+
+    const { status, body } = await fitbitGetSafe(
+        `/1/user/-/hrv/date/${formatDate(startDate)}/${formatDate(rangeEnd)}.json`
+    );
+
+    if (status !== 200) { console.log(`   ⚠️  HRV API returned ${status}`); return; }
+
+    const records = body?.hrv || [];
+    let totalRows = 0;
+
+    for (const day of records) {
+        const readings = day.minutes || [];
+        const rows = readings.map(m => ({
+            timestamp: new Date(m.minute).toISOString(),
+            root_mean_square_of_successive_differences_milliseconds: String(m.value?.rmssd ?? 0),
+            standard_deviation_milliseconds: String(m.value?.coverage ?? 0),
+            data_source: 'Fitbit API'
+        }));
+        if (rows.length > 0) {
+            await sql`INSERT INTO heart_rate_variability ${sql(rows)} ON CONFLICT DO NOTHING`;
+            totalRows += rows.length;
+        }
+    }
+    console.log(`   ✅ Inserted ${totalRows} new HRV records`);
+}
+
+// ── Sync: Skin Temperature ────────────────────────────────────────────────────
+async function syncTemperature() {
+    const startDate = await getLastSyncDate('device_temperature', 'recorded_time');
+    const today = new Date();
+    const rangeEnd = new Date(Math.min(addDays(startDate, 29).getTime(), today.getTime()));
+    console.log(`\n🌡️  Temperature: syncing from ${formatDate(startDate)} to ${formatDate(rangeEnd)}`);
+
+    const { status, body } = await fitbitGetSafe(
+        `/1/user/-/temp/skin/date/${formatDate(startDate)}/${formatDate(rangeEnd)}.json`
+    );
+
+    if (status !== 200) { console.log(`   ⚠️  Temperature API returned ${status}`); return; }
+
+    const records = body?.tempSkin || [];
+    let totalRows = 0;
+
+    for (const day of records) {
+        if (day.value?.nightlyRelative != null) {
+            await sql`
+                INSERT INTO device_temperature (recorded_time, temperature, sensor_type)
+                VALUES (${new Date(day.dateTime).toISOString()}, ${String(day.value.nightlyRelative)}, ${'Fitbit API'})
+                ON CONFLICT DO NOTHING
+            `;
+            totalRows++;
+        }
+    }
+    console.log(`   ✅ Inserted ${totalRows} new temperature records`);
+}
+
+// ── Sync: Distance (intraday 1min) ────────────────────────────────────────────
+async function syncDistance() {
+    const startDate = await getLastSyncDate('distance', 'timestamp');
+    const today = new Date();
+    console.log(`\n📍 Distance: syncing from ${formatDate(startDate)} to ${formatDate(today)}`);
+
+    let current = new Date(startDate);
+    let totalRows = 0;
+
+    while (current <= today) {
+        const date = formatDate(current);
+        const { status, body } = await fitbitGetSafe(`/1/user/-/activities/distance/date/${date}/1d/1min.json`);
+
+        if (status === 200) {
+            const dataset = body?.['activities-distance-intraday']?.dataset || [];
+            const rows = dataset
+                .filter(d => d.value > 0)
+                .map(d => ({
+                    timestamp: new Date(`${date}T${d.time}`).toISOString(),
+                    distance: String(d.value),
+                    data_source: 'Fitbit API'
+                }));
+            if (rows.length > 0) {
+                await sql`
+                    INSERT INTO distance (timestamp, distance, data_source)
+                    SELECT x.ts::timestamptz, x.dist::numeric, x.src
+                    FROM (VALUES ${sql(rows.map(r => [r.timestamp, r.distance, r.data_source]))}) AS x(ts, dist, src)
+                    ON CONFLICT DO NOTHING
+                `;
+                totalRows += rows.length;
+            }
+        } else if (status === 429) {
+            console.log('   ⏳ Rate limited. Run again later.');
+            break;
+        }
+        current = addDays(current, 1);
+    }
+    console.log(`   ✅ Inserted ${totalRows} new distance records`);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function run() {
     console.log('🔄 Starting smart Fitbit sync...');
@@ -407,9 +517,12 @@ async function run() {
         { name: 'Steps',               fn: syncSteps },
         { name: 'Heart Rate',          fn: syncHeartRate },
         { name: 'Calories',            fn: syncCalories },
+        { name: 'Distance',            fn: syncDistance },
         { name: 'Sleep',               fn: syncSleep },
         { name: 'Active Zone Minutes', fn: syncActiveZoneMinutes },
         { name: 'SpO2',                fn: syncSpO2 },
+        { name: 'HRV',                 fn: syncHRV },
+        { name: 'Temperature',         fn: syncTemperature },
     ];
 
     for (const metric of metrics) {

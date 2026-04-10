@@ -1,21 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_FITBITDB",
-      "label": "FitbitDB",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "postgres",
-      "pluginName": "PostgreSQL"
-    }
-  ],
-  "__requires": [
-    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
-    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
-    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
-    { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
-    { "type": "panel", "id": "barchart", "name": "Bar chart", "version": "" }
-  ],
   "annotations": { "list": [] },
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -30,7 +13,7 @@
     {
       "id": 1, "title": "Steps Today", "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
       "fieldConfig": {
         "defaults": {
@@ -43,7 +26,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT COALESCE(SUM(total_steps), 0) AS \"Steps Today\" FROM steps_daily WHERE day = CURRENT_DATE",
         "format": "table", "refId": "A"
       }]
@@ -52,7 +35,7 @@
     {
       "id": 2, "title": "Avg Heart Rate (7d)", "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
       "fieldConfig": {
         "defaults": {
@@ -65,7 +48,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT ROUND(AVG(avg_bpm)::numeric, 1) AS \"Avg BPM\" FROM heart_rate_daily WHERE day >= CURRENT_DATE - 7",
         "format": "table", "refId": "A"
       }]
@@ -74,7 +57,7 @@
     {
       "id": 3, "title": "Last Night's Sleep", "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
       "fieldConfig": {
         "defaults": {
@@ -87,7 +70,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT total_hours AS \"Hours\" FROM sleep_nightly ORDER BY night DESC LIMIT 1",
         "format": "table", "refId": "A"
       }]
@@ -96,7 +79,7 @@
     {
       "id": 4, "title": "Latest HRV (RMSSD)", "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background", "graphMode": "none" },
       "fieldConfig": {
         "defaults": {
@@ -109,7 +92,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT ROUND(AVG(root_mean_square_of_successive_differences_milliseconds)::numeric, 1) AS \"RMSSD\" FROM heart_rate_variability WHERE timestamp >= NOW() - INTERVAL '3 days'",
         "format": "table", "refId": "A"
       }]
@@ -121,7 +104,7 @@
     {
       "id": 5, "title": "Daily Heart Rate", "type": "timeseries",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "tooltip": { "mode": "multi", "sort": "none" },
         "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] }
@@ -138,7 +121,7 @@
         ]
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT day::timestamptz AS \"time\", min_bpm AS \"Min BPM\", avg_bpm AS \"Avg BPM\", max_bpm AS \"Max BPM\" FROM heart_rate_daily WHERE day BETWEEN $__timeFrom()::date AND $__timeTo()::date ORDER BY day",
         "format": "table", "refId": "A"
       }]
@@ -150,7 +133,7 @@
     {
       "id": 6, "title": "Daily Steps", "type": "barchart",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "orientation": "auto", "xTickLabelRotation": 0, "xTickLabelSpacing": 100,
         "barRadius": 0.05, "groupWidth": 0.7, "fillOpacity": 80, "gradientMode": "none",
@@ -168,7 +151,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT day::timestamptz AS \"time\", total_steps AS \"Steps\" FROM steps_daily WHERE day BETWEEN $__timeFrom()::date AND $__timeTo()::date ORDER BY day",
         "format": "table", "refId": "A"
       }]
@@ -177,7 +160,7 @@
     {
       "id": 7, "title": "Daily Calories Burned", "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "tooltip": { "mode": "single", "sort": "none" },
         "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean"] }
@@ -189,7 +172,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT DATE(timestamp AT TIME ZONE 'UTC')::timestamptz AS \"time\", ROUND(SUM(calories::numeric), 0) AS \"Calories\" FROM calories WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1",
         "format": "table", "refId": "A"
       }]
@@ -201,7 +184,7 @@
     {
       "id": 8, "title": "Nightly Sleep Duration", "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "tooltip": { "mode": "multi", "sort": "none" },
         "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean"] }
@@ -220,7 +203,7 @@
         ]
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT night::timestamptz AS \"time\", total_hours AS \"Total (h)\", ROUND((deep_min / 60.0)::numeric, 2) AS \"Deep (h)\", ROUND((rem_min / 60.0)::numeric, 2) AS \"REM (h)\" FROM sleep_nightly WHERE night BETWEEN $__timeFrom()::date AND $__timeTo()::date ORDER BY night",
         "format": "table", "refId": "A"
       }]
@@ -229,7 +212,7 @@
     {
       "id": 9, "title": "Sleep Stage Breakdown (last 14 nights)", "type": "barchart",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "orientation": "auto", "xTickLabelRotation": -45, "groupWidth": 0.7, "fillOpacity": 80,
         "stacking": "normal", "gradientMode": "none",
@@ -246,7 +229,7 @@
         ]
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT night::timestamptz AS \"time\", deep_min AS \"Deep\", rem_min AS \"REM\", light_min AS \"Light\", awake_min AS \"Awake\" FROM sleep_nightly ORDER BY night DESC LIMIT 14",
         "format": "table", "refId": "A"
       }]
@@ -258,7 +241,7 @@
     {
       "id": 10, "title": "Heart Rate Variability (RMSSD)", "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "tooltip": { "mode": "single", "sort": "none" },
         "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean", "last"] }
@@ -270,7 +253,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT DATE_TRUNC('day', timestamp)::timestamptz AS \"time\", ROUND(AVG(root_mean_square_of_successive_differences_milliseconds)::numeric, 1) AS \"RMSSD (ms)\" FROM heart_rate_variability WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1",
         "format": "table", "refId": "A"
       }]
@@ -279,7 +262,7 @@
     {
       "id": 11, "title": "Skin Temperature (Nightly Relative)", "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 33 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "tooltip": { "mode": "single", "sort": "none" },
         "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean", "last"] }
@@ -294,7 +277,7 @@
         }
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT DATE_TRUNC('day', recorded_time)::timestamptz AS \"time\", ROUND(AVG(temperature)::numeric, 3) AS \"Temp ΔC\" FROM device_temperature WHERE $__timeFilter(recorded_time) GROUP BY 1 ORDER BY 1",
         "format": "table", "refId": "A"
       }]
@@ -306,7 +289,7 @@
     {
       "id": 12, "title": "Weekly Averages", "type": "timeseries",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 42 },
-      "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+      "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
       "options": {
         "tooltip": { "mode": "multi", "sort": "none" },
         "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["mean"] }
@@ -323,7 +306,7 @@
         ]
       },
       "targets": [{
-        "datasource": { "type": "postgres", "uid": "${DS_FITBITDB}" },
+        "datasource": { "type": "postgres", "uid": "fitbit-postgres" },
         "rawSql": "SELECT week::timestamptz AS \"time\", avg_daily_steps AS \"Avg Steps/day\", avg_resting_bpm AS \"Avg BPM\" FROM weekly_summary WHERE week BETWEEN $__timeFrom()::timestamptz AND $__timeTo()::timestamptz ORDER BY week",
         "format": "table", "refId": "A"
       }]

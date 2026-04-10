@@ -223,6 +223,110 @@ The dashboard at **[http://localhost:3000](http://localhost:3000)** has 12 pre-b
 
 ---
 
+## 🛠️ Adding New Panels & Queries to Grafana
+
+### Step 1 — Open the dashboard editor
+
+1. Go to **[http://localhost:3000](http://localhost:3000)**
+2. Open the **Fitbit Health Dashboard**
+3. Click **Edit** (top right) → then **Add → Visualization**
+
+### Step 2 — Write your SQL query
+
+Select **FitbitDB** as the datasource, switch to **Code** mode, and write your SQL.
+
+**Key rules for Grafana SQL:**
+
+| Requirement | How to do it |
+|---|---|
+| Time column must be named `time` | Alias it: `SELECT day AS "time"` |
+| Time column must be `timestamptz` | Cast if needed: `day::timestamptz` |
+| Filter by the dashboard's date range | Use `$__timeFilter(column)` macro |
+| Group time into buckets | Use `DATE_TRUNC('day', column)` |
+
+**Grafana macros available:**
+
+```sql
+$__timeFilter(timestamp)          -- WHERE timestamp BETWEEN dashboard_start AND dashboard_end
+$__timeFrom()                     -- the start of the current date range
+$__timeTo()                       -- the end of the current date range
+```
+
+### Step 3 — Example queries you can add
+
+**Weekly step goal progress (% of 10,000 steps):**
+```sql
+SELECT
+  day::timestamptz AS "time",
+  ROUND((total_steps / 10000.0 * 100)::numeric, 1) AS "Goal %"
+FROM steps_daily
+WHERE day BETWEEN $__timeFrom()::date AND $__timeTo()::date
+ORDER BY day
+```
+
+**Resting heart rate trend (7-day rolling average):**
+```sql
+SELECT
+  day::timestamptz AS "time",
+  ROUND(AVG(avg_bpm) OVER (ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)::numeric, 1) AS "7d Avg BPM"
+FROM heart_rate_daily
+WHERE day BETWEEN $__timeFrom()::date AND $__timeTo()::date
+ORDER BY day
+```
+
+**Sleep efficiency (deep + REM as % of total):**
+```sql
+SELECT
+  night::timestamptz AS "time",
+  ROUND(((deep_min + rem_min) * 100.0 / NULLIF(total_hours * 60, 0))::numeric, 1) AS "Quality %"
+FROM sleep_nightly
+WHERE night BETWEEN $__timeFrom()::date AND $__timeTo()::date
+ORDER BY night
+```
+
+**Active Zone Minutes by zone type:**
+```sql
+SELECT
+  DATE(date_time AT TIME ZONE 'UTC')::timestamptz AS "time",
+  SUM(CASE WHEN heart_zone_id = 'FAT_BURN' THEN total_minutes ELSE 0 END) AS "Fat Burn",
+  SUM(CASE WHEN heart_zone_id = 'CARDIO'   THEN total_minutes ELSE 0 END) AS "Cardio",
+  SUM(CASE WHEN heart_zone_id = 'PEAK'     THEN total_minutes ELSE 0 END) AS "Peak"
+FROM active_zone_minutes
+WHERE $__timeFilter(date_time)
+GROUP BY 1 ORDER BY 1
+```
+
+### Step 4 — Choose the right panel type
+
+| Panel type | Best for |
+|---|---|
+| **Time series** | Trends over time (heart rate, HRV, sleep) |
+| **Bar chart** | Daily totals (steps, calories, AZM) |
+| **Stat** | Single current value (today's steps, last sleep) |
+| **Gauge** | Progress toward a target (step goal %) |
+| **Bar gauge** | Comparing values side by side |
+| **Table** | Showing raw rows with multiple columns |
+
+### Step 5 — Save changes back to the provisioned file
+
+> ⚠️ Grafana dashboards loaded from files are **read-only by default** in the UI. To persist your changes so they survive a container restart:
+
+1. After editing, click **Save dashboard** → copy the JSON by going to **Dashboard settings → JSON Model**
+2. Replace the contents of `grafana/provisioning/dashboards/fitbit_health.json` with the copied JSON
+3. Commit and push:
+
+```bash
+git add grafana/provisioning/dashboards/fitbit_health.json
+git commit -m "feat: add [your panel name] panel to Grafana dashboard"
+git push origin master
+```
+
+Next time anyone runs `docker compose up -d`, they'll get your updated dashboard automatically.
+
+> **Tip:** To allow free editing in the UI without the read-only restriction, set `allowUiUpdates: true` in `grafana/provisioning/dashboards/provider.yml` — this is already enabled in this repo.
+
+---
+
 ## 🗄️ Connecting to the Database
 
 ### Terminal (no install needed)

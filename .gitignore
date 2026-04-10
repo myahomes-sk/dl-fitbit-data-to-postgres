@@ -11,7 +11,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs — keep the folder in git, ignore the actual log files
+logs/*.log
 *.log
 
 # -----------------------------------------------

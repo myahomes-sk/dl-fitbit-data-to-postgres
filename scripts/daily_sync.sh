@@ -31,7 +31,6 @@ echo "════════════════════════�
 # ── Find node — cron has a minimal PATH ──────────────────────
 NODE_BIN=$(command -v node 2>/dev/null || echo "/usr/local/bin/node")
 if [ ! -x "$NODE_BIN" ]; then
-    # Try common locations
     for p in /usr/bin/node /usr/local/bin/node ~/.nvm/versions/node/*/bin/node; do
         if [ -x "$p" ]; then NODE_BIN="$p"; break; fi
     done
@@ -40,6 +39,15 @@ fi
 if [ ! -x "$NODE_BIN" ]; then
     echo "[$DATE] ❌ node not found. Install Node.js or update PATH." >> "$LOG_FILE"
     exit 1
+fi
+
+# ── Check Postgres is running — skip if Docker is down ────────
+DOCKER_BIN=$(command -v docker 2>/dev/null || echo "/usr/local/bin/docker")
+DB_RUNNING=$("$DOCKER_BIN" ps --filter "name=fitbit-postgres" --filter "status=running" -q 2>/dev/null)
+
+if [ -z "$DB_RUNNING" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⏭️  Skipping sync — Postgres is not running (docker compose is down)." >> "$LOG_FILE"
+    exit 0
 fi
 
 # ── Run sync ─────────────────────────────────────────────────

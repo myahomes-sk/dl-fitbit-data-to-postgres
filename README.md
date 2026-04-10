@@ -93,10 +93,52 @@ You'll see output like:
 ⏳ Processing Active Zone Minutes - 2022-01-01.csv -> table: active_zone_minutes
    ✅ Migrated 507 rows into "active_zone_minutes"
 
-⏳ Processing estimated_oxygen_variation-2022-01-02.csv -> table: estimated_oxygen_variation
-   ✅ Migrated 448 rows into "estimated_oxygen_variation"
-
 🎉 Universal Migration complete!
+```
+
+---
+
+### Step 4 — Set Up Ongoing API Sync
+
+The CSV export is a one-time snapshot. To keep your database up to date with fresh data, connect it to the Fitbit API.
+
+#### 4a. Register a Fitbit Developer App (one time)
+
+1. Go to **[dev.fitbit.com/apps/new](https://dev.fitbit.com/apps/new)**
+2. Fill in:
+   - **Application Type:** `Personal` ← required for intraday heart rate data
+   - **Redirect URI:** `http://localhost:8000/callback`
+3. Copy your **Client ID** and **Client Secret** into `.env`
+
+#### 4b. Authorize your account (one time per machine)
+
+```bash
+node fitbit_auth.js
+```
+
+This opens your browser, asks you to log in to Fitbit, then automatically saves your `ACCESS_TOKEN` and `REFRESH_TOKEN` to `.env`. Tokens are automatically refreshed on every subsequent sync.
+
+#### 4c. Run the sync
+
+```bash
+node sync.js
+```
+
+The sync is **self-aware** — for each metric it checks the latest timestamp already in your local database and fetches only newer data from the Fitbit API. It works correctly no matter where you are:
+
+| Scenario | Behavior |
+|---|---|
+| Your DB (data up to Apr 6) | Syncs Apr 7 → today |
+| Fresh DB (no data) | Syncs last 30 days via API |
+| Another team member's DB | Syncs from wherever their data ends |
+
+Tokens auto-refresh so you never need to re-run `fitbit_auth.js` unless you revoke access.
+
+#### 4d. Schedule daily sync via cron (optional)
+
+```bash
+# Run sync.js every day at 7am
+0 7 * * * cd /path/to/dl-fitbit-data && node sync.js >> sync.log 2>&1
 ```
 
 ---

@@ -1,58 +1,50 @@
-# 🏃 Fitbit Data — Local SQL Analytics
+# 🏃 Fitbit Health Analytics — Local SQL + Grafana Dashboard
 
-A fully offline, Docker-powered Postgres database built from your personal Fitbit export. Ingest years of health telemetry into a local SQL database and query it however you like — no cloud account needed, no row limits.
+A fully offline, Docker-powered Postgres database built from your personal Fitbit export — with a live Grafana dashboard, smart Fitbit API sync, and pre-built SQL analytics views.
+
+- **No cloud account needed. No row limits. No subscription.**
+- Works on macOS and Linux. A PST colleague can clone and run it on data from an IST user — it just works.
 
 ---
 
-## 📦 What This Does
+## 📦 What This Repo Gives You
 
-- Spins up a local **Postgres 15** database via Docker
-- Reads all your Fitbit CSV export files
-- Consolidates them into **104 clean SQL tables** (multi-file metrics like heart rate are stitched into one table per metric)
-- Lets you write unlimited SQL queries entirely offline
+| Feature | Details |
+|---|---|
+| 🗄️ **Offline Postgres DB** | 104 SQL tables from your Fitbit CSV export |
+| 🔄 **Smart API Sync** | `sync.js` — incremental, timezone-safe, 9 metrics |
+| 📊 **Grafana Dashboard** | 12 auto-provisioned panels, zero config |
+| 👁️ **Analytics Views** | `sleep_nightly`, `heart_rate_daily`, `steps_daily`, `weekly_summary` |
+| 🔐 **OAuth Flow** | `fitbit_auth.js` — zero-dependency, one-time browser login |
 
 ---
 
 ## 💻 Compatibility
 
 | Platform | Supported |
-|----------|-----------|
+|---|---|
 | macOS (Intel + Apple Silicon) | ✅ |
 | Linux (Ubuntu / Debian) | ✅ |
-| Windows (WSL2) | ⚠️ Mostly works — run `bash setup.sh` inside WSL2 |
-
-> The `setup.sh` script auto-detects your OS. On **macOS** it uses Homebrew to install dependencies. On **Linux** it uses apt/get.docker.com.
+| Windows (WSL2) | ⚠️ Run `bash setup.sh` inside WSL2 |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started (New User Checklist)
 
 ### Step 1 — Get Your Fitbit Data
 
 1. Go to **[Google Takeout → Fitbit](https://takeout.google.com/settings/takeout/custom/fitbit?pli=1)**
-2. Make sure only **Fitbit** is selected, then click **Next step → Create export**
-3. Download the `.zip` file when it's ready (Google will email you)
-4. Extract the zip — you'll find a folder structure like:
-
-```
-Takeout/
-  Fitbit/
-    Heart Rate/
-    Sleep/
-    Active Zone Minutes (AZM)/
-    ... (30+ folders)
-```
-
-5. Copy **all the folders inside `Fitbit/`** directly into the root of this cloned repo, so it looks like:
+2. Select only **Fitbit**, click **Next → Create export**
+3. Download and extract the `.zip` — you'll see folders like `Heart Rate/`, `Sleep/`, etc.
+4. Copy **all the folders inside `Fitbit/`** into the root of this repo:
 
 ```
 dl-fitbit-data/
-  Heart Rate/           ← pasted here
-  Sleep/                ← pasted here
-  Active Zone Minutes/  ← pasted here
+  Heart Rate/           ← paste here
+  Sleep/                ← paste here
+  Active Zone Minutes/  ← paste here
   ...
   setup.sh
-  auto_migrate.js
   docker-compose.yml
 ```
 
@@ -64,265 +56,285 @@ dl-fitbit-data/
 bash setup.sh
 ```
 
-This script automatically detects **macOS or Linux** and will:
-- ✅ Install **Docker** if not found
-  - *macOS*: via Homebrew (`brew install --cask docker`) or prompts you to install Docker Desktop
-  - *Linux*: via `get.docker.com` (requires sudo)
-- ✅ Install **Node.js** if not found
-  - *macOS*: via Homebrew (`brew install node`)
-  - *Linux*: via NodeSource apt repository
-- ✅ Copy `.env.example` → `.env` with local database credentials
-- ✅ Pull and start the **Postgres 15** Docker container
-- ✅ Install Node package dependencies
+Auto-detects macOS or Linux and installs Docker + Node.js if missing, copies `.env.example` → `.env`, and starts the Postgres container.
 
-> **macOS users**: If you don't have Homebrew, install it first from [brew.sh](https://brew.sh), or manually install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and [Node.js](https://nodejs.org/en/download) before running `setup.sh`.
+> **macOS**: Install [Homebrew](https://brew.sh) first if you don't have it.
 
 ---
 
-### Step 3 — Migrate Your Data
+### Step 3 — Migrate CSV Data
 
 ```bash
 node auto_migrate.js
 ```
 
-This will scan all your Fitbit folders, automatically detect column types, and load everything into the local database. Depending on how many years of data you have, this can take **5–20 minutes**.
-
-You'll see output like:
+Scans all your Fitbit folders, detects column types, and loads everything into the local DB. Takes **5–20 minutes** depending on years of data. Output looks like:
 
 ```
-⏳ Processing Active Zone Minutes - 2022-01-01.csv -> table: active_zone_minutes
-   ✅ Migrated 507 rows into "active_zone_minutes"
-
+⏳ Processing Heart Rate/2026-02-01.csv -> table: heart_rate
+   ✅ Migrated 14400 rows into "heart_rate"
 🎉 Universal Migration complete!
 ```
 
 ---
 
-### Step 4 — Set Up Ongoing API Sync
+### Step 4 — Open the Grafana Dashboard
 
-The CSV export is a one-time snapshot. To keep your database up to date with fresh data, connect it to the Fitbit API.
+```bash
+docker compose up -d
+```
 
-#### 4a. Register a Fitbit Developer App (one time)
+Then open: **[http://localhost:3000](http://localhost:3000)**
+
+```
+Username: admin
+Password: fitbit_admin
+```
+
+The **Fitbit Health Dashboard** loads automatically as the home page with 12 panels showing all your health metrics. Use the date range picker (top right) to zoom into any time window.
+
+> Docker starts both Postgres (port 5432) and Grafana (port 3000). Both restart automatically when your machine reboots.
+
+---
+
+### Step 5 — Connect to the Fitbit API (Keep Data Fresh)
+
+The CSV export is a one-time snapshot. To sync new data daily:
+
+#### 5a. Register a Fitbit Developer App (one time)
 
 1. Go to **[dev.fitbit.com/apps/new](https://dev.fitbit.com/apps/new)**
 2. Fill in:
    - **Application Type:** `Personal` ← required for intraday heart rate data
    - **Redirect URI:** `http://localhost:8000/callback`
-3. Copy your **Client ID** and **Client Secret** into `.env`
+3. Copy your **Client ID** and **Client Secret** into `.env`:
 
-#### 4b. Authorize your account (one time per machine)
+```env
+FITBIT_CLIENT_ID="your_client_id"
+FITBIT_CLIENT_SECRET="your_client_secret"
+```
+
+#### 5b. Authorize your account (one time per machine)
 
 ```bash
 node fitbit_auth.js
 ```
 
-This opens your browser, asks you to log in to Fitbit, then automatically saves your `ACCESS_TOKEN` and `REFRESH_TOKEN` to `.env`. Tokens are automatically refreshed on every subsequent sync.
+Opens your browser, you log in to Fitbit, and tokens are saved to `.env` automatically. You never need to repeat this unless you revoke access.
 
-#### 4c. Run the sync
+#### 5c. Run the sync
 
 ```bash
 node sync.js
 ```
 
-The sync is **self-aware** — for each metric it checks the latest timestamp already in your local database and fetches only newer data from the Fitbit API. It works correctly no matter where you are:
+Output:
+```
+Using Fitbit wearer timezone: Asia/Kolkata
+🔄 Starting smart Fitbit sync...
+
+🚶 Steps: syncing from 2026-04-07 to 2026-04-10
+   ✅ Inserted 0 new step records
+
+😴 Sleep: syncing from 2026-04-07 to 2026-04-10
+   ✅ Inserted 141 new sleep stage records from 6 sessions
+
+⚡ Active Zone Minutes: syncing from 2026-04-09 to 2026-04-10
+   ✅ Inserted 10 new AZM records
+
+🎉 Sync complete!
+```
+
+**The sync is self-aware** — it checks the latest timestamp in your local DB for each metric and fetches only the missing data:
 
 | Scenario | Behavior |
 |---|---|
-| Your DB (data up to Apr 6) | Syncs Apr 7 → today |
-| Fresh DB (no data) | Syncs last 30 days via API |
-| Another team member's DB | Syncs from wherever their data ends |
+| DB has data up to Apr 6 | Syncs Apr 7 → today |
+| Fresh DB with no API data | Syncs last 30 days |
+| Team member's DB (older) | Picks up exactly from where their data ends |
 
-Tokens auto-refresh so you never need to re-run `fitbit_auth.js` unless you revoke access.
-
-#### 4d. Schedule daily sync via cron (optional)
+#### 5d. Schedule daily auto-sync (optional)
 
 ```bash
-# Run sync.js every day at 7am
-0 7 * * * cd /path/to/dl-fitbit-data && node sync.js >> sync.log 2>&1
+# Edit your crontab
+crontab -e
+
+# Add this line — runs every morning at 7am
+0 7 * * * cd /path/to/dl-fitbit-data && node sync.js >> logs/sync.log 2>&1
 ```
+
+---
+
+## 📊 Metrics Synced
+
+| Metric | Source | Table |
+|---|---|---|
+| 🚶 Steps | Intraday 1-min | `steps` |
+| ❤️ Heart Rate | Intraday 1-sec | `heart_rate` |
+| 🔥 Calories | Intraday 1-min | `calories` |
+| 📍 Distance | Intraday 1-min | `distance` |
+| 😴 Sleep Stages | Session-based | `usersleepstages` |
+| ⚡ Active Zone Minutes | Daily | `active_zone_minutes` |
+| 🫁 SpO2 | Minutely | `oxygen_saturation` |
+| 💓 HRV (RMSSD) | Minutely | `heart_rate_variability` |
+| 🌡️ Skin Temperature | Nightly | `device_temperature` |
+
+---
+
+## 📊 Grafana Dashboard Panels
+
+The dashboard at **[http://localhost:3000](http://localhost:3000)** has 12 pre-built panels, grouped into sections:
+
+| Section | Panels |
+|---|---|
+| 📊 Today's Summary | Steps today · Avg HR (7d) · Last night's sleep · Latest HRV |
+| ❤️ Heart Rate | Daily min/avg/max BPM time series |
+| 🚶 Activity | Daily steps bar chart · Daily calories burned |
+| 😴 Sleep | Nightly sleep hours · Sleep stage breakdown (Deep/REM/Light/Awake) |
+| 💓 HRV & Temperature | Daily RMSSD trend · Nightly skin temperature |
+| 📅 Weekly Summary | Avg steps + avg BPM per week |
+
+**Date range**: Use the picker (top right) to zoom into any period. Dashboard auto-refreshes every 5 minutes.
 
 ---
 
 ## 🗄️ Connecting to the Database
 
-### Option 1 — Terminal (psql via Docker, no install needed)
+### Terminal (no install needed)
 
 ```bash
 docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db
 ```
 
-Once inside, try:
-
+Once inside:
 ```sql
--- List all tables
-\dt
-
--- See all tables with row counts
-SELECT relname AS table, n_live_tup AS rows
-FROM pg_stat_user_tables
-ORDER BY n_live_tup DESC;
-
--- Exit
-\q
+\dt                  -- list all tables
+\d heart_rate        -- see columns of a table
+SELECT * FROM steps LIMIT 5;
+\q                   -- exit
 ```
 
-### Option 2 — GUI Client (TablePlus, DBeaver, DataGrip, etc.)
+### GUI Client (TablePlus, DBeaver, DataGrip)
 
-Use these connection details:
-
-| Setting  | Value         |
-|----------|---------------|
-| Host     | `localhost`   |
-| Port     | `5432`        |
-| Database | `fitbit_db`   |
+| Setting | Value |
+|---|---|
+| Host | `localhost` |
+| Port | `5432` |
+| Database | `fitbit_db` |
 | Username | `fitbit_user` |
 | Password | `fitbit_pass` |
 
 ---
 
-## 📊 Running Queries
+## 🧠 Pre-Built Analytics Views
 
-You can run any SQL query as a one-liner directly from your terminal — no need to enter the interactive shell. Just replace the SQL inside the `-c "..."` flag.
+These views handle all the tricky logic (timezone conversion, source deduplication, session filtering) for you:
 
-### 📋 Explore your data
+### `sleep_nightly` — Correct nightly sleep attribution
 
-**List all tables with row counts:**
+Handles IST/UTC timezone correctly, filters naps, prefers API data over CSV where overlap exists.
+
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT night, total_hours, deep_min, rem_min, light_min FROM sleep_nightly ORDER BY night DESC LIMIT 7;"
+```
+
+### `heart_rate_daily` — Daily HR summary
+
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT day, min_bpm, avg_bpm, max_bpm FROM heart_rate_daily ORDER BY day DESC LIMIT 7;"
+```
+
+### `steps_daily` — Daily step totals
+
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT day, total_steps, active_minutes FROM steps_daily ORDER BY day DESC LIMIT 7;"
+```
+
+### `weekly_summary` — Week-over-week health overview
+
+```bash
+docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
+  "SELECT week, avg_daily_steps, avg_resting_bpm, avg_daily_calories FROM weekly_summary LIMIT 8;"
+```
+
+---
+
+## 📋 Useful One-Liner Queries
+
+### All tables with row counts
 ```bash
 docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
   "SELECT relname AS table_name, n_live_tup AS row_count FROM pg_stat_user_tables ORDER BY n_live_tup DESC;"
 ```
 
-**See the columns of a specific table:**
+### 7-day sleep average
 ```bash
 docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "\d heart_rate"
+  "SELECT ROUND(AVG(total_hours)::numeric,2) AS avg_hrs, ROUND(AVG(deep_min)::numeric,1) AS avg_deep, ROUND(AVG(rem_min)::numeric,1) AS avg_rem FROM sleep_nightly WHERE night >= CURRENT_DATE - 7;"
 ```
 
-**Preview the first 5 rows of any table:**
+### Heart rate trend (monthly avg)
 ```bash
 docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT * FROM steps LIMIT 5;"
+  "SELECT DATE_TRUNC('month', day) AS month, ROUND(AVG(avg_bpm)::numeric,1) AS avg_bpm FROM heart_rate_daily GROUP BY 1 ORDER BY 1 DESC LIMIT 12;"
 ```
 
----
-
-### ❤️ Heart Rate
-
-**Average resting heart rate per month:**
+### HRV 30-day trend
 ```bash
 docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT DATE_TRUNC('month', datetime) AS month, ROUND(AVG(bpm)::numeric, 1) AS avg_bpm FROM heart_rate GROUP BY 1 ORDER BY 1;"
+  "SELECT DATE_TRUNC('day', timestamp)::date AS day, ROUND(AVG(root_mean_square_of_successive_differences_milliseconds)::numeric,1) AS rmssd FROM heart_rate_variability WHERE timestamp >= NOW() - INTERVAL '30 days' GROUP BY 1 ORDER BY 1;"
 ```
 
-**Highest ever recorded heart rate:**
+### Active Zone Minutes last 30 days
 ```bash
 docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT datetime, bpm FROM heart_rate ORDER BY bpm DESC LIMIT 10;"
+  "SELECT DATE(date_time) AS day, heart_zone_id, total_minutes FROM active_zone_minutes WHERE date_time >= NOW() - INTERVAL '30 days' ORDER BY day DESC, heart_zone_id;"
 ```
-
----
-
-### 🚶 Steps
-
-**Daily step count over the last 90 days:**
-```bash
-docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT DATE(datetime) AS day, SUM(steps) AS total_steps FROM steps WHERE datetime >= NOW() - INTERVAL '90 days' GROUP BY 1 ORDER BY 1;"
-```
-
-**Best step days ever:**
-```bash
-docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT DATE(datetime) AS day, SUM(steps) AS total_steps FROM steps GROUP BY 1 ORDER BY 2 DESC LIMIT 10;"
-```
-
----
-
-### 😴 Sleep
-
-**Monthly sleep profile summary:**
-```bash
-docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT creation_date, sleep_type, ROUND(sleep_duration::numeric, 2) AS hours, ROUND(deep_sleep::numeric, 1) AS deep_pct, ROUND(rem_sleep::numeric, 1) AS rem_pct FROM sleep_profiles ORDER BY creation_date DESC LIMIT 12;"
-```
-
----
-
-### 💓 Heart Rate Variability (HRV)
-
-**Monthly average HRV (RMSSD):**
-```bash
-docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT DATE_TRUNC('month', timestamp) AS month, ROUND(AVG(rmssd)::numeric, 1) AS avg_rmssd FROM heart_rate_variability GROUP BY 1 ORDER BY 1;"
-```
-
----
-
-### 🌡️ Temperature
-
-**Average wrist temperature by month:**
-```bash
-docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT DATE_TRUNC('month', datetime) AS month, ROUND(AVG(temperature_celsius)::numeric, 2) AS avg_temp_c FROM device_temperature GROUP BY 1 ORDER BY 1;"
-```
-
----
-
-### 🔥 Calories
-
-**Total calories burned per week:**
-```bash
-docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db -c \
-  "SELECT DATE_TRUNC('week', datetime) AS week, ROUND(SUM(calorie)::numeric, 0) AS total_calories FROM calories GROUP BY 1 ORDER BY 1 DESC LIMIT 20;"
-```
-
----
-
-> **Tip:** You can also enter the interactive shell for longer queries:
-> ```bash
-> docker exec -it fitbit-postgres psql -U fitbit_user -d fitbit_db
-> ```
-> Then type your SQL freely and exit with `\q`.
 
 ---
 
 ## 🗂️ Key Tables
 
 | Table | Description |
-|-------|-------------|
-| `heart_rate` | Per-minute heart rate (~42M rows) |
+|---|---|
+| `heart_rate` | Per-minute heart rate (intraday, ~42M+ rows) |
 | `steps` | Per-minute step counts |
 | `calories` | Per-minute calorie burn |
-| `active_zone_minutes` | Active zone minutes by type |
-| `estimated_oxygen_variation` | SpO2 variation across nights |
-| `device_temperature` | Wrist skin temperature |
-| `body_temperature` | Core body temperature |
-| `heart_rate_variability` | HRV per measurement |
-| `sleep_profiles` | Monthly sleep profile summaries |
-| `usersleepstages` | Per-night sleep staging |
-| `oxygen_saturation` | Blood oxygen saturation |
-| `distance` | Per-minute distance covered |
+| `distance` | Per-minute distance |
+| `active_zone_minutes` | AZM by zone type (Fat Burn / Cardio / Peak) |
+| `usersleepstages` | Per-night sleep stage data |
+| `oxygen_saturation` | SpO2 minutely readings |
+| `device_temperature` | Nightly wrist skin temperature |
+| `heart_rate_variability` | HRV (RMSSD) per reading |
+| `sleep_nightly` *(view)* | Clean nightly sleep summary |
+| `heart_rate_daily` *(view)* | Daily HR min/avg/max |
+| `steps_daily` *(view)* | Daily step totals |
+| `weekly_summary` *(view)* | Week-over-week averages |
 
 ---
 
-## 🔄 Managing the Database
+## 🔄 Managing Containers
 
-### Stop the database
 ```bash
-docker compose down
-```
-
-### Start it again later
-```bash
+# Start everything (Postgres + Grafana)
 docker compose up -d
-```
 
-### Re-run migration (safe — won't duplicate data)
-```bash
+# Stop everything
+docker compose down
+
+# View logs
+docker logs fitbit-grafana
+docker logs fitbit-postgres
+
+# Re-run migration (safe — rebuilds tables from CSV)
 node auto_migrate.js
-```
 
-> The script uses `DROP TABLE IF EXISTS` before creating each table, so re-running it is safe and idempotent — it will simply rebuild from scratch.
+# Sync latest data from Fitbit API
+node sync.js
+```
 
 ---
 
@@ -330,21 +342,55 @@ node auto_migrate.js
 
 ```
 dl-fitbit-data/
-├── setup.sh            # Smart setup script (installs deps, starts DB)
-├── auto_migrate.js     # Universal CSV → Postgres ingestion script
-├── migrate.js          # Legacy script (Sleep + Heart Rate only)
-├── docker-compose.yml  # Postgres 15 container definition
-├── package.json        # Node.js dependencies
-├── .env.example        # Environment variable template
-├── .gitignore          # Excludes data folders, .env, .db_data
-└── README.md           # This file
+├── setup.sh                    # Smart setup (installs Docker + Node, starts DB)
+├── auto_migrate.js             # Universal CSV → Postgres ingestion
+├── fitbit_auth.js              # One-time OAuth2 login (saves tokens to .env)
+├── sync.js                     # Smart incremental API sync (9 metrics)
+├── docker-compose.yml          # Postgres 15 + Grafana 10.4 containers
+├── grafana/
+│   └── provisioning/
+│       ├── datasources/
+│       │   └── fitbit.yml      # Auto-connects Grafana → Postgres
+│       └── dashboards/
+│           ├── provider.yml    # Dashboard file loader config
+│           └── fitbit_health.json  # 12-panel health dashboard
+├── package.json
+├── .env.example                # Environment variable template
+├── .gitignore                  # Excludes data folders, .env, .db_data
+└── README.md
 ```
 
 ---
 
-## ⚠️ Notes
+## ⚙️ Environment Variables (`.env`)
 
-- **Data not included** — The Fitbit CSV folders are excluded from git (they're personal health data). See Step 1 to get your own.
-- **`.env` is excluded** — Never commit your `.env` file. Use `.env.example` as a reference.
-- **Local only** — The database runs fully offline. No cloud, no limits.
-- **Re-cloning** — If you clone to a new machine, just repeat Steps 1–3. The migration takes a few minutes to rebuild.
+Copy `.env.example` → `.env` and fill in:
+
+```env
+# Local Postgres (pre-filled, don't change)
+DATABASE_URL="postgresql://fitbit_user:fitbit_pass@localhost:5432/fitbit_db"
+
+# Timezone of the Fitbit WEARER (not the machine running the script)
+# Used for correct sleep date attribution — leave as-is unless it's your own data
+FITBIT_USER_TIMEZONE="Asia/Kolkata"
+
+# Fitbit API credentials — from dev.fitbit.com/apps/new
+FITBIT_CLIENT_ID="your_client_id"
+FITBIT_CLIENT_SECRET="your_client_secret"
+
+# Auto-managed by fitbit_auth.js — do not edit manually
+FITBIT_ACCESS_TOKEN=""
+FITBIT_REFRESH_TOKEN=""
+```
+
+> **Important:** `.env` is gitignored. Never commit it — it contains your personal API credentials.
+
+---
+
+## ⚠️ Notes & Known Limitations
+
+- **Data not included** — Fitbit CSV folders are gitignored. See Step 1 to get your own via Google Takeout.
+- **Fitbit API deprecation** — The legacy Fitbit Web API will be deprecated in **September 2026**. A migration to the Google Health API will be needed before then.
+- **Rate limiting** — Fitbit API limits intraday data to 150 requests/hour. If a backfill hits the limit, just re-run `node sync.js` — it picks up where it left off.
+- **SpO2 availability** — Returns 404 if your device didn't record SpO2 on those dates. Not an error.
+- **Sleep timezone** — All sleep queries use `FITBIT_USER_TIMEZONE` for correct date attribution. A colleague in PST running the sync should leave this as your timezone (IST) since it's your data.

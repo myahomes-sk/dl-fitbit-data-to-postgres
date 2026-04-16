@@ -537,3 +537,94 @@ FITBIT_REFRESH_TOKEN=""
 - **Rate limiting** — Fitbit API limits intraday data to 150 requests/hour. If a backfill hits the limit, just re-run `node sync.js` — it picks up where it left off.
 - **SpO2 availability** — Returns 404 if your device didn't record SpO2 on those dates. Not an error.
 - **Sleep timezone** — All sleep queries use `FITBIT_USER_TIMEZONE` for correct date attribution. A colleague in PST running the sync should leave this as your timezone (IST) since it's your data.
+
+---
+
+## 🧩 Codebase Internals
+
+### Migration Pipeline
+
+| Script | Scope | Behavior |
+|---|---|---|
+| `auto_migrate.js` | All CSV folders (recursive) | **Destructive** — `DROP TABLE IF EXISTS CASCADE` then recreate. Infers schema per column (NUMERIC / TIMESTAMPTZ / TEXT). Batches inserts at 500 rows. Strips date suffixes from filenames to consolidate monthly CSVs into single tables (e.g. `heart_rate_2026_02.csv` → `heart_rate`) |
+| `migrate.js` | `Heart Rate Notifications Alerts.csv` + `Sleep Profile.csv` only | Non-destructive — `ON CONFLICT DO NOTHING`. Creates `heart_rate_alerts` and `sleep_profiles` tables. Legacy script, superseded by `auto_migrate.js` |
+| `migrate_hrv.js` | `Heart Rate Variability/` folder only | Same logic as `auto_migrate.js` but scoped to HRV. Was needed before `auto_migrate.js` excluded HRV from `IGNORE_DIRS` |
+
+### Sync Engine (`sync.js`)
+
+**9 metrics** synced incrementally. Each checks `MAX(date_column)` in its target table to find the gap start:
+
+| Metric | API Endpoint | Intraday | Range Limit | Table | Date Column |
+|---|---|---|---|---|---|
+| Steps | `/activities/steps/date/{d}/1d/1min` | 1-min | 1 day/req | `steps` | `timestamp` |
+| Heart Rate | `/activities/heart/date/{d}/1d/1sec` | 1-sec | 1 day/req | `heart_rate` | `timestamp` |
+| Calories | `/activities/calories/date/{d}/1d/1min` | 1-min | 1 day/req | `calories` | `timestamp` |
+| Distance | `/activities/distance/date/{d}/1d/1min` | 1-min | 1 day/req | `distance` | `timestamp` |
+| Sleep | `/1.2/user/-/sleep/date/{start}/{end}` | session | 100 days | `usersleepstages` | `sleep_stage_start` |
+| AZM | `/activities/active-zone-minutes/date/{start}/{end}` | daily | no limit | `active_zone_minutes` | `date_time` |
+| SpO2 | `/spo2/date/{start}/{end}/minutely` | 1-min | 30 days | `oxygen_saturation` | `timestamp` |
+| HRV | `/hrv/date/{start}/{end}` | 1-min | 30 days | `heart_rate_variability` | `timestamp` |
+| Temperature | `/temp/skin/date/{start}/{end}` | nightly | 30 days | `device_temperature` | `recorded_time` |
+
+**Key behaviors:**
+
+- **Token auto-refresh** — On 401, automatically refreshes `FITBIT_ACCESS_TOKEN` using refresh token and persists both to `.env`
+- **Rate limit handling** — On 429, stops the current metric and moves on. Re-run picks up where it left off
+- **Sleep dedup** — Deletes existing `Fitbit API` rows by `sleep_id` before re-inserting, preventing duplicates from re-runs
+- **Zero-value filtering** — Steps, calories, and distance skip rows where `value === 0`
+- **Fallback** — If a table has no data yet, syncs the last 30 days as starting point
+
+### OAuth Flow (`fitbit_auth.js`)
+
+- Spins up `http://localhost:8000/callback`
+- Opens browser to Fitbit OAuth2 authorize URL
+- Exchanges auth code for access + refresh tokens
+- Writes tokens to `.env` via regex replacement
+- Scopes: `activity`, `heartrate`, `sleep`, `oxygen_saturation`, `respiratory_rate`, `temperature`, `profile`
+
+### Cron & Logging
+
+- `scripts/daily_sync.sh` — Checks Docker Postgres is running (skips if down), runs `node sync.js`, logs to `logs/sync.log`, rotates to 500 lines
+- `scripts/install_cron.sh` — Idempotent crontab installer (`0 7 * * *`), won't add duplicates
+- `setup.sh` — Full bootstrap: installs Docker + Node (Linux/macOS), copies `.env.example` → `.env`, starts Postgres, runs `npm install`
+
+### Database Views
+
+Pre-built analytics views handle timezone conversion, source deduplication, and session filtering:
+
+| View | Description |
+|---|---|
+| `sleep_nightly` | Nightly sleep attribution with correct IST/UTC handling, nap filtering, API/CSV dedup |
+| `heart_rate_daily` | Daily min/avg/max BPM aggregation |
+| `steps_daily` | Daily step totals with active minutes |
+| `weekly_summary` | Week-over-week averages (steps, HR, calories) |
+
+### Dependency Notes
+
+- `@supabase/supabase-js` — **Vestigial**. All DB access uses `postgres` package directly. Supabase was the original cloud backend; migrated to local Postgres. Safe to remove if no code imports it
+- `postgres` (v3.4.9) — Primary DB driver. Used by all migration and sync scripts
+- `csv-parser` — Used by `auto_migrate.js`, `migrate.js`, `migrate_hrv.js`
+- `dotenv` — Loads `.env` in all scripts
+
+### Infrastructure
+
+| Service | Image | Port | Credentials |
+|---|---|---|---|
+| Postgres | `postgres:15-alpine` | 5432 | `fitbit_user` / `fitbit_pass` / `fitbit_db` |
+| Grafana | `grafana/grafana:10.4.18` | 3000 | `admin` / `fitbit_admin` |
+
+- Grafana home dashboard: `fitbit_health.json` (12 panels, auto-refresh 5m)
+- Datasource auto-provisioned as `FitbitDB` → `db:5432`
+- Both containers use `restart: unless-stopped`
+- Postgres data persisted in `.db_data/` (gitignored, ~5-6 GB)
+
+### `auto_migrate.js` Schema Inference Logic
+
+1. Sanitize column names: lowercase, replace non-alphanumeric with `_`, trim edges
+2. Deduplicate headers: if collision, append `_1`, `_2`, etc.
+3. Type inference per column: scan all rows — if all non-null values parse as numbers → `NUMERIC`; else if all parse as dates → `TIMESTAMPTZ`; else → `TEXT`
+4. Filename → table name: strip date suffixes (`- 2020-09-01`, `- 2020-11`, `- 2020`), then sanitize
+5. Adds `_raw_id SERIAL PRIMARY KEY` to every table
+6. Consolidates multiple monthly CSVs into one table (e.g. 12 HR CSVs → 1 `heart_rate` table)
+7. `IGNORE_DIRS`: `node_modules`, `.agent`, `temp_ralph`, `tasks`, `.git`, `Heart Rate`, `Sleep`, `.db_data`
+   - `Heart Rate` and `Sleep` are excluded because they contain per-second/per-stage CSVs that would create enormous tables; the API sync (`sync.js`) handles these metrics instead
